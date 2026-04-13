@@ -3,8 +3,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BDL_API_KEY = os.environ["BDL_API_KEY"]
-PROPODDS_API_KEY = os.environ["PROPODDS_API_KEY"]
-ODDS_API_KEY = os.environ["ODDS_API_KEY"]
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+def _require(key: str) -> str:
+    val = os.getenv(key)
+    if not val:
+        raise ValueError(f"{key} is not set. Copy .env.example to .env and fill in your API keys.")
+    return val
+
+BDL_API_KEY = _require("BDL_API_KEY")
+PROPODDS_API_KEY = _require("PROPODDS_API_KEY")
+ODDS_API_KEY = _require("ODDS_API_KEY")
+ANTHROPIC_API_KEY = _require("ANTHROPIC_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL", "edgeiq.db")
