@@ -10,7 +10,6 @@ def _require(key: str) -> str:
     return val
 
 BDL_API_KEY = _require("BDL_API_KEY")
-PROPODDS_API_KEY = _require("PROPODDS_API_KEY")
 ODDS_API_KEY = _require("ODDS_API_KEY")
 ANTHROPIC_API_KEY = _require("ANTHROPIC_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL", "edgeiq.db")

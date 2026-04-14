@@ -7,8 +7,6 @@ services:
     envVars:
       - key: BDL_API_KEY
         sync: false
-      - key: PROPODDS_API_KEY
-        sync: false
       - key: ODDS_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY

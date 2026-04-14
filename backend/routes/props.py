@@ -1,7 +1,7 @@
 import asyncio
 from fastapi import APIRouter, HTTPException, Query
 from backend.services.balldontlie import search_players, get_game_logs
-from backend.services.propodds import get_player_props, get_historical_lines
+from backend.services.odds_api import get_player_props
 from backend.services.model import calc_probability, calc_ev, get_distribution
 
 router = APIRouter(prefix="/props", tags=["props"])
@@ -19,7 +19,8 @@ async def get_prop(
     window: int = Query(default=10, ge=0),
     player_name: str = Query(...),
 ):
-    logs, prop, historical = await _fetch_logs_and_prop(player_id, stat_category, window, player_name)
+    logs, prop = await _fetch_logs_and_prop(player_id, stat_category, window, player_name)
+    historical = []
     if prop is None:
         raise HTTPException(status_code=404, detail="No odds found for this prop")
 
@@ -55,5 +56,4 @@ async def _fetch_logs_and_prop(player_id, stat_category, window, player_name):
     return await asyncio.gather(
         get_game_logs(player_id, stat_category, window),
         get_player_props(player_name, stat_category),
-        get_historical_lines(player_name, stat_category),
     )
