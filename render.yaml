@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: edgeiq-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: BDL_API_KEY
+        sync: false
+      - key: PROPODDS_API_KEY
+        sync: false
+      - key: ODDS_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        value: /var/data/edgeiq.db
+    disk:
+      name: edgeiq-data
+      mountPath: /var/data
+      sizeGB: 1
