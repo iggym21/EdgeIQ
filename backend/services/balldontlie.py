@@ -1,4 +1,5 @@
 import httpx
+from fastapi import HTTPException
 from backend.config import BDL_API_KEY
 
 BASE_URL = "https://api.balldontlie.io/v1"
@@ -21,8 +22,12 @@ async def search_players(name: str) -> list[dict]:
             params={"search": name, "per_page": 10},
             headers=HEADERS,
         )
+    if r.status_code == 401:
+        raise HTTPException(status_code=502, detail="BallDontLie API key is invalid or missing")
+    if r.status_code == 429:
+        raise HTTPException(status_code=429, detail="BallDontLie rate limit hit — try again in a moment")
     if r.status_code >= 400:
-        r.raise_for_status()
+        raise HTTPException(status_code=502, detail=f"BallDontLie error: {r.status_code}")
     return [
         {
             "id": p["id"],
@@ -50,8 +55,12 @@ async def get_game_logs(
             },
             headers=HEADERS,
         )
+    if r.status_code == 401:
+        raise HTTPException(status_code=502, detail="BallDontLie API key is invalid or missing")
+    if r.status_code == 429:
+        raise HTTPException(status_code=429, detail="BallDontLie rate limit hit — try again in a moment")
     if r.status_code >= 400:
-        r.raise_for_status()
+        raise HTTPException(status_code=502, detail=f"BallDontLie error: {r.status_code}")
 
     games = sorted(r.json()["data"], key=lambda g: g.get("game", {}).get("date", ""), reverse=True)
     if window > 0:
