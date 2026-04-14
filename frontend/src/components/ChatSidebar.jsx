@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { streamChat } from '../api/client'
 import axios from 'axios'
+import ReactMarkdown from 'react-markdown'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -67,7 +68,17 @@ export default function ChatSidebar({ propData, onClose }) {
                 ? 'bg-green-500/20 text-green-100'
                 : 'bg-gray-800 text-gray-200'
             }`}>
-              {m.content || (streaming && i === messages.length - 1 ? '▋' : '')}
+              {m.role === 'assistant' ? (
+                m.content
+                  ? <ReactMarkdown className="prose prose-invert prose-sm max-w-none
+                                             prose-p:my-1 prose-ul:my-1 prose-li:my-0
+                                             prose-table:text-xs prose-th:py-1 prose-td:py-1">
+                      {m.content}
+                    </ReactMarkdown>
+                  : (streaming && i === messages.length - 1 ? '▋' : '')
+              ) : (
+                m.content
+              )}
             </div>
           </div>
         ))}
@@ -124,6 +135,7 @@ function buildContext(p) {
     ev: p.ev,
     edge_pct: p.edge_pct,
     game_log_values: p.game_log?.map((g) => g.value) ?? [],
+    full_season_log: p.full_season_log ?? [],
     open_line: p.historical_lines?.[0]?.line ?? p.line,
     sample_size: p.sample_size,
     low_confidence: p.low_confidence,

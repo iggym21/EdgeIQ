@@ -41,7 +41,8 @@ def stream_chat(payload: ChatRequest):
                 messages=messages,
             ) as stream:
                 for text in stream.text_stream:
-                    yield f"data: {text}\n\n"
+                    # Escape newlines so multi-line chunks don't break SSE framing
+                    yield f"data: {text.replace(chr(10), '\\n')}\n\n"
         except Exception as e:
             yield f"data: [ERROR] {e}\n\n"
         yield "data: [DONE]\n\n"

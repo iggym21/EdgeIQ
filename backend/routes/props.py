@@ -19,7 +19,13 @@ async def get_prop(
     window: int = Query(default=10, ge=0),
     player_name: str = Query(...),
 ):
-    logs, prop = await _fetch_logs_and_prop(player_id, stat_category, window, player_name)
+    # Fetch full season + windowed logs + odds concurrently
+    full_logs, prop = await asyncio.gather(
+        get_game_logs(player_id, stat_category, 0),   # full season (window=0)
+        get_player_props(player_name, stat_category),
+    )
+
+    logs = full_logs[:window] if window > 0 else full_logs
     historical = []
 
     values = [g["value"] for g in logs]
@@ -35,6 +41,7 @@ async def get_prop(
             "player_name": player_name,
             "stat_category": stat_category,
             "game_log": logs,
+            "full_season_log": full_logs,
             "distribution": get_distribution(stat_category),
             "window": window if window > 0 else "season",
             "sample_size": len(values),
@@ -50,6 +57,7 @@ async def get_prop(
         **prop,
         **ev_data,
         "game_log": logs,
+        "full_season_log": full_logs,
         "distribution": get_distribution(stat_category),
         "window": window if window > 0 else "season",
         "sample_size": len(values),
@@ -57,10 +65,3 @@ async def get_prop(
         "historical_lines": historical,
         "odds_available": True,
     }
-
-
-async def _fetch_logs_and_prop(player_id, stat_category, window, player_name):
-    return await asyncio.gather(
-        get_game_logs(player_id, stat_category, window),
-        get_player_props(player_name, stat_category),
-    )
