@@ -2,10 +2,11 @@ services:
   - type: web
     name: edgeiq-api
     runtime: python
-    pythonVersion: "3.11.9"
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
       - key: BDL_API_KEY
         sync: false
       - key: ODDS_API_KEY
