@@ -21,21 +21,27 @@ async def get_prop(
 ):
     logs, prop = await _fetch_logs_and_prop(player_id, stat_category, window, player_name)
     historical = []
-    if prop is None:
-        raise HTTPException(status_code=404, detail="No odds found for this prop")
-
-    if prop.get("line") is None or prop.get("over_odds") is None:
-        raise HTTPException(
-            status_code=422,
-            detail="Prop data is incomplete (missing line or odds)"
-        )
 
     values = [g["value"] for g in logs]
     if not values:
         raise HTTPException(
             status_code=422,
-            detail=f"No game log data found for this player and stat category"
+            detail="No game log data found for this player and stat category"
         )
+
+    # No odds available — return logs without EV so the frontend can offer manual input
+    if prop is None or prop.get("line") is None or prop.get("over_odds") is None:
+        return {
+            "player_name": player_name,
+            "stat_category": stat_category,
+            "game_log": logs,
+            "distribution": get_distribution(stat_category),
+            "window": window if window > 0 else "season",
+            "sample_size": len(values),
+            "low_confidence": len(values) < 10,
+            "historical_lines": historical,
+            "odds_available": False,
+        }
 
     your_prob = calc_probability(values, prop["line"], stat_category)
     ev_data = calc_ev(your_prob, prop["over_odds"])
@@ -49,6 +55,7 @@ async def get_prop(
         "sample_size": len(values),
         "low_confidence": len(values) < 10,
         "historical_lines": historical,
+        "odds_available": True,
     }
 
 

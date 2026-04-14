@@ -27,7 +27,7 @@ async def get_player_props(player_name: str, stat_category: str) -> dict | None:
             },
         )
         if r.status_code >= 400:
-            r.raise_for_status()
+            return None
         events = r.json()
 
     for event in events:

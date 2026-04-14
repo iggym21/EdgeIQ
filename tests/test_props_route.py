@@ -35,13 +35,15 @@ def test_get_prop_returns_200_with_ev():
     assert "your_prob" in data
 
 
-def test_get_prop_returns_404_when_no_odds():
+def test_get_prop_returns_200_without_ev_when_no_odds():
     with patch("backend.routes.props.get_game_logs", new_callable=AsyncMock,
                return_value=MOCK_LOGS * 10), \
          patch("backend.routes.props.get_player_props", new_callable=AsyncMock,
                return_value=None):
         r = client.get("/props/1/points?window=10&player_name=LeBron+James")
-    assert r.status_code == 404
+    assert r.status_code == 200
+    assert r.json()["odds_available"] is False
+    assert "game_log" in r.json()
 
 
 def test_get_prop_returns_422_when_no_game_logs():

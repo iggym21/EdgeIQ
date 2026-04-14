@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react'
 import { searchPlayers, getProp } from '../api/client'
+import axios from 'axios'
+
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 import DistChart from '../components/DistChart'
 import EVCard from '../components/EVCard'
 import LineMove from '../components/LineMove'
@@ -19,6 +22,9 @@ export default function Analyze() {
   const [error, setError] = useState(null)
   const [chatOpen, setChatOpen] = useState(false)
   const [betFormOpen, setBetFormOpen] = useState(false)
+  const [manualLine, setManualLine] = useState('')
+  const [manualOdds, setManualOdds] = useState('')
+  const [manualLoading, setManualLoading] = useState(false)
 
   const handleSearch = async (e) => {
     e.preventDefault()
@@ -53,6 +59,32 @@ export default function Analyze() {
   const handleWindowChange = (w) => {
     setWindow(w)
     loadProp(w)
+  }
+
+  const handleManualEV = async (e) => {
+    e.preventDefault()
+    if (!propData || !manualLine || !manualOdds) return
+    setManualLoading(true)
+    try {
+      const values = propData.game_log.map((g) => g.value)
+      const r = await axios.post(`${BASE_URL}/ev`, {
+        game_log_values: values,
+        line: parseFloat(manualLine),
+        odds: parseInt(manualOdds),
+        stat_category: propData.stat_category,
+      })
+      setPropData({
+        ...propData,
+        line: parseFloat(manualLine),
+        over_odds: parseInt(manualOdds),
+        odds_available: true,
+        ...r.data,
+      })
+    } catch (err) {
+      setError('Failed to calculate EV')
+    } finally {
+      setManualLoading(false)
+    }
   }
 
   return (
@@ -109,6 +141,42 @@ export default function Analyze() {
 
         {error && (
           <p className="text-red-400 text-sm mb-4">{error}</p>
+        )}
+
+        {/* Manual odds input when no odds are available */}
+        {propData && propData.odds_available === false && (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+            <p className="text-sm text-gray-400 mb-3">
+              No odds found automatically. Enter the line and odds manually to calculate EV.
+            </p>
+            <form onSubmit={handleManualEV} className="flex gap-2 items-end">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Line</label>
+                <input
+                  type="number" step="0.5" value={manualLine}
+                  onChange={(e) => setManualLine(e.target.value)}
+                  placeholder="24.5"
+                  className="w-24 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2
+                             text-sm text-gray-100 focus:outline-none focus:border-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Over odds</label>
+                <input
+                  type="number" value={manualOdds}
+                  onChange={(e) => setManualOdds(e.target.value)}
+                  placeholder="-110"
+                  className="w-24 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2
+                             text-sm text-gray-100 focus:outline-none focus:border-green-500"
+                />
+              </div>
+              <button type="submit" disabled={manualLoading}
+                className="px-4 py-2 bg-green-500 text-gray-900 rounded-lg text-sm
+                           font-medium hover:bg-green-400 disabled:opacity-50">
+                {manualLoading ? 'Calculating...' : 'Calculate EV'}
+              </button>
+            </form>
+          </div>
         )}
 
         {/* Analytics grid */}
