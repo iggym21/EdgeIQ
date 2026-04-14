@@ -27,17 +27,23 @@ def get_chips(payload: ChipsRequest):
 @router.post("")
 def stream_chat(payload: ChatRequest):
     system = build_system_prompt(payload.prop_context)
-    messages = [*payload.history, {"role": "user", "content": payload.message}]
+    # Filter out empty-content messages (e.g. from failed prior streams) to
+    # avoid Anthropic rejecting the request with a 400 invalid_request_error.
+    clean_history = [m for m in payload.history if m.get("content", "").strip()]
+    messages = [*clean_history, {"role": "user", "content": payload.message}]
 
     def generate():
-        with client.messages.stream(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=system,
-            messages=messages,
-        ) as stream:
-            for text in stream.text_stream:
-                yield f"data: {text}\n\n"
+        try:
+            with client.messages.stream(
+                model="claude-sonnet-4-6",
+                max_tokens=1024,
+                system=system,
+                messages=messages,
+            ) as stream:
+                for text in stream.text_stream:
+                    yield f"data: {text}\n\n"
+        except Exception as e:
+            yield f"data: [ERROR] {e}\n\n"
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")

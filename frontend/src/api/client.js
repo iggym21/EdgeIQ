@@ -39,7 +39,12 @@ export const streamChat = (payload, onChunk, onDone) => {
       text.split('\n').forEach((line) => {
         if (line.startsWith('data: ')) {
           const chunk = line.slice(6)
-          if (chunk !== '[DONE]') onChunk(chunk)
+          if (chunk === '[DONE]') return
+          if (chunk.startsWith('[ERROR] ')) {
+            onChunk(`⚠️ ${chunk.slice(8)}`)
+          } else {
+            onChunk(chunk)
+          }
         }
       })
     }
