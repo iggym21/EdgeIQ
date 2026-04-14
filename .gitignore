@@ -22,3 +22,11 @@ Thumbs.db
 # IDEs
 .vscode/
 .idea/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Generated / temp
+graphify-out/
+pytest-of-*/
