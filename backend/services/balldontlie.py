@@ -1,86 +1,88 @@
-import httpx
+import asyncio
+from datetime import datetime
+from functools import partial
 from fastapi import HTTPException
-from backend.config import BDL_API_KEY
-
-BASE_URL = "https://api.balldontlie.io/v1"
-HEADERS = {"Authorization": BDL_API_KEY}
+from nba_api.stats.static import players as nba_players
+from nba_api.stats.endpoints import playergamelog
 
 STAT_MAP = {
-    "points": "pts",
-    "rebounds": "reb",
-    "assists": "ast",
-    "steals": "stl",
-    "blocks": "blk",
-    "minutes": "min",
+    "points": "PTS",
+    "rebounds": "REB",
+    "assists": "AST",
+    "steals": "STL",
+    "blocks": "BLK",
+    "minutes": "MIN",
 }
 
 
-async def search_players(name: str) -> list[dict]:
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.get(
-            f"{BASE_URL}/players",
-            params={"search": name, "per_page": 10},
-            headers=HEADERS,
-        )
-    if r.status_code == 401:
-        raise HTTPException(status_code=502, detail="BallDontLie API key is invalid or missing")
-    if r.status_code == 429:
-        raise HTTPException(status_code=429, detail="BallDontLie rate limit hit — try again in a moment")
-    if r.status_code >= 400:
-        raise HTTPException(status_code=502, detail=f"BallDontLie error: {r.status_code}")
+def _current_season() -> str:
+    now = datetime.now()
+    year = now.year
+    if now.month >= 10:
+        return f"{year}-{str(year + 1)[2:]}"
+    return f"{year - 1}-{str(year)[2:]}"
+
+
+def _search_sync(name: str) -> list[dict]:
+    all_active = nba_players.get_active_players()
+    matches = [p for p in all_active if name.lower() in p["full_name"].lower()]
     return [
-        {
-            "id": p["id"],
-            "name": f"{p['first_name']} {p['last_name']}",
-            "team": p.get("team", {}).get("full_name", ""),
-        }
-        for p in r.json()["data"]
+        {"id": p["id"], "name": p["full_name"], "team": ""}
+        for p in matches[:10]
     ]
 
 
-async def get_game_logs(
-    player_id: int, stat_category: str, window: int = 10
-) -> list[dict]:
-    field = STAT_MAP.get(stat_category.lower(), "pts")
-    # window=0 means full season — fetch up to 100 games
-    per_page = 100 if window == 0 else max(window, 25)
-
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.get(
-            f"{BASE_URL}/stats",
-            params={
-                "player_ids[]": player_id,
-                "per_page": per_page,
-                "seasons[]": 2024,  # TODO: update to current season each year
-            },
-            headers=HEADERS,
-        )
-    if r.status_code == 401:
-        raise HTTPException(status_code=502, detail="BallDontLie API key is invalid or missing")
-    if r.status_code == 429:
-        raise HTTPException(status_code=429, detail="BallDontLie rate limit hit — try again in a moment")
-    if r.status_code >= 400:
-        raise HTTPException(status_code=502, detail=f"BallDontLie error: {r.status_code}")
-
-    games = sorted(r.json()["data"], key=lambda g: g.get("game", {}).get("date", ""), reverse=True)
+def _logs_sync(player_id: int, stat_category: str, window: int) -> list[dict]:
+    field = STAT_MAP.get(stat_category.lower(), "PTS")
+    season = _current_season()
+    log = playergamelog.PlayerGameLog(player_id=player_id, season=season, timeout=30)
+    df = log.get_data_frames()[0]
+    if df.empty:
+        return []
     if window > 0:
-        games = games[:window]
-
+        df = df.head(window)
     result = []
-    for g in games:
-        player_team_id = g.get("team", {}).get("id")
-        home_team_id = g.get("game", {}).get("home_team_id")
+    for _, row in df.iterrows():
+        val = row.get(field, 0)
+        if field == "MIN":
+            val = _parse_minutes(str(val))
+        else:
+            val = float(val or 0)
+        matchup = str(row.get("MATCHUP", ""))
+        if "@" in matchup:
+            home_away = "away"
+            opponent = matchup.split("@")[-1].strip()
+        else:
+            home_away = "home"
+            opponent = matchup.split("vs.")[-1].strip()
         result.append({
-            "game_date": g.get("game", {}).get("date", ""),
-            "value": _parse_minutes(g[field]) if field == "min" else (g[field] or 0),
-            "opponent": "",  # BDL stats endpoint doesn't include opponent team details
-            "home_away": "home" if player_team_id == home_team_id else "away",
+            "game_date": str(row.get("GAME_DATE", "")),
+            "value": val,
+            "opponent": opponent,
+            "home_away": home_away,
         })
     return result
 
 
+async def search_players(name: str) -> list[dict]:
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(None, partial(_search_sync, name))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"NBA API error: {e}")
+
+
+async def get_game_logs(player_id: int, stat_category: str, window: int = 10) -> list[dict]:
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(None, partial(_logs_sync, player_id, stat_category, window))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"NBA API error: {e}")
+
+
 def _parse_minutes(min_str: str) -> float:
-    """Convert '35:30' → 35.5"""
     if not min_str or ":" not in min_str:
         return 0.0
     try:

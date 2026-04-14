@@ -9,7 +9,6 @@ def _require(key: str) -> str:
         raise ValueError(f"{key} is not set. Copy .env.example to .env and fill in your API keys.")
     return val
 
-BDL_API_KEY = _require("BDL_API_KEY")
 ODDS_API_KEY = _require("ODDS_API_KEY")
 ANTHROPIC_API_KEY = _require("ANTHROPIC_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL", "edgeiq.db")
